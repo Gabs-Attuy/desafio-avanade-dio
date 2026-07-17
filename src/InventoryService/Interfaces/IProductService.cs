@@ -13,4 +13,6 @@ public interface IProductService
     Task<int?> GetStockByProductIdAsync(int id);
 
     Task<ProductResponseDto> UpdateProductAsync(int id, UpdateProductDto dto);
+
+    Task DecreaseStockAsync(IEnumerable<(int ProductId, int Quantity)> items);
 }
