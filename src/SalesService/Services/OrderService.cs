@@ -1,6 +1,7 @@
 using SalesService.DTOs.Order;
 using SalesService.Enums;
 using SalesService.Interfaces;
+using SalesService.Messaging.Events;
 using SalesService.Models;
 
 namespace SalesService.Services;
@@ -9,11 +10,16 @@ public class OrderService : IOrderService
 {
     private readonly IOrderRepository _orderRepository;
     private readonly IInventoryClient _inventoryClient;
+    private readonly IOrderCreatedProducer _orderCreatedProducer;
 
-    public OrderService(IOrderRepository orderRepository, IInventoryClient inventoryClient)
+    public OrderService(
+        IOrderRepository orderRepository,
+        IInventoryClient inventoryClient,
+        IOrderCreatedProducer orderCreatedProducer)
     {
         _orderRepository = orderRepository;
         _inventoryClient = inventoryClient;
+        _orderCreatedProducer = orderCreatedProducer;
     }
 
     public async Task<OrderResponseDto> AddOrderAsync(CreateOrderDto createOrderDto)
@@ -49,6 +55,19 @@ public class OrderService : IOrderService
         order.TotalAmount = order.Items.Sum(i => i.UnitPrice * i.Quantity);
 
         await _orderRepository.AddAsync(order);
+
+        var orderCreatedEvent = new OrderCreatedEvent
+        {
+            OrderId = order.Id,
+
+            Items = [.. order.Items.Select(item => new OrderCreatedItemEvent
+            {
+                ProductId = item.ProductId,
+                Quantity = item.Quantity
+            })]
+        };
+
+        await _orderCreatedProducer.PublishAsync(orderCreatedEvent);
 
         return ToDto(order);
     }
