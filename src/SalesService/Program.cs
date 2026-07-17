@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SalesService.Clients;
 using SalesService.Data;
 using SalesService.Interfaces;
+using SalesService.Messaging.Producers;
 using SalesService.Middleware;
 using SalesService.Repositories;
 using SalesService.Services;
@@ -26,6 +27,7 @@ builder.Services.AddDbContext<SalesContext>(options =>
 
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IOrderService, OrderService>();
+builder.Services.AddScoped<IOrderCreatedProducer, OrderCreatedProducer>();
 
 builder.Services.AddHttpClient<IInventoryClient, InventoryClient>(client =>
 {
