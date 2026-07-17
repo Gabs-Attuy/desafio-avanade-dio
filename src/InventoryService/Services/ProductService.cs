@@ -1,3 +1,4 @@
+using InventoryService.Data;
 using InventoryService.DTOs;
 using InventoryService.Interfaces;
 using InventoryService.Models;
@@ -7,10 +8,12 @@ namespace InventoryService.Services;
 public class ProductService : IProductService
 {
     private readonly IProductRepository _productRepository;
+    private readonly InventoryContext _context;
 
-    public ProductService(IProductRepository productRepository)
+    public ProductService(IProductRepository productRepository, InventoryContext context)
     {
         _productRepository = productRepository;
+        _context = context;
     }
 
     public async Task<ProductResponseDto?> GetProductByIdAsync(int id)
@@ -64,6 +67,48 @@ public class ProductService : IProductService
         await _productRepository.UpdateAsync(product);
 
         return ToDto(product);
+    }
+
+    public async Task DecreaseStockAsync(IEnumerable<(int ProductId, int Quantity)> items)
+    {
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        try
+        {
+            foreach (var item in items)
+            {
+                if (item.Quantity <= 0)
+                {
+                    throw new ArgumentException(
+                        $"A quantidade do produto {item.ProductId} deve ser maior que zero.");
+                }
+
+                var product =
+                    await _productRepository.GetByIdAsync(item.ProductId)
+                    ?? throw new KeyNotFoundException(
+                        $"Produto com ID {item.ProductId} não encontrado.");
+
+                if (product.Stock < item.Quantity)
+                {
+                    throw new InvalidOperationException(
+                        $"Estoque insuficiente para o produto {product.Name}. " +
+                        $"Disponível: {product.Stock}, " +
+                        $"Solicitado: {item.Quantity}.");
+                }
+
+                product.Stock -= item.Quantity;
+            }
+
+            await _context.SaveChangesAsync();
+
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+
+            throw;
+        }
     }
 
     private static void ValidateProductPriceAndStock(decimal price, int stock)

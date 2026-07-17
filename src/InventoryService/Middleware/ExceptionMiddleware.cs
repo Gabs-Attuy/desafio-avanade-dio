@@ -41,6 +41,12 @@ public class ExceptionMiddleware
                 exception.Message
             },
 
+            InvalidOperationException => new
+            {
+                StatusCode = StatusCodes.Status400BadRequest,
+                exception.Message
+            },
+
             _ => new
             {
                 StatusCode = StatusCodes.Status500InternalServerError,
