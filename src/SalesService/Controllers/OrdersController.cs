@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SalesService.DTOs.Order;
 using SalesService.Enums;
@@ -16,6 +17,7 @@ public class OrdersController : ControllerBase
         _orderService = orderService;
     }
 
+    [Authorize]
     [HttpPost]
     [ProducesResponseType(typeof(OrderResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -25,6 +27,7 @@ public class OrdersController : ControllerBase
         return CreatedAtAction(nameof(GetOrderById), new { id = orderResponse.Id }, orderResponse);
     }
 
+    [Authorize]
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(OrderResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -38,6 +41,7 @@ public class OrdersController : ControllerBase
         return Ok(orderResponse);
     }
 
+    [Authorize]
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<OrderResponseDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllOrders()
@@ -46,6 +50,7 @@ public class OrdersController : ControllerBase
         return Ok(orders);
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPatch("{id}/status")]
     [ProducesResponseType(typeof(OrderResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
