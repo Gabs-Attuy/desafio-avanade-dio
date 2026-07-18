@@ -58,7 +58,7 @@ public class AuthenticationService : IAuthenticationService
     }
 
     public async Task<AuthResponseDto> RegisterAdminAsync(
-    RegisterUserDto dto)
+        RegisterUserDto dto)
     {
         var email = dto.Email
             .Trim()
