@@ -69,6 +69,17 @@ public class ProductService : IProductService
         return ToDto(product);
     }
 
+    public async Task<ProductResponseDto> UpdateProductStatusAsync(int id)
+    {
+        var product = await _productRepository.GetByIdAsync(id) ?? throw new KeyNotFoundException("Produto não encontrado.");
+
+        product.IsActive = !product.IsActive;
+
+        await _productRepository.UpdateAsync(product);
+
+        return ToDto(product);
+    }
+
     public async Task DecreaseStockAsync(IEnumerable<(int ProductId, int Quantity)> items)
     {
         await using var transaction = await _context.Database.BeginTransactionAsync();
@@ -128,7 +139,8 @@ public class ProductService : IProductService
             Name = product.Name,
             Description = product.Description,
             Price = product.Price,
-            Stock = product.Stock
+            Stock = product.Stock,
+            IsActive = product.IsActive
         };
     }
 }

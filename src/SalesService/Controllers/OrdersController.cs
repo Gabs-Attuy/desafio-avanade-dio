@@ -1,4 +1,7 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using SalesService.DTOs.Order;
 using SalesService.Enums;
@@ -23,8 +26,17 @@ public class OrdersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateOrder([FromBody] CreateOrderDto createOrderDto)
     {
-        var orderResponse = await _orderService.AddOrderAsync(createOrderDto);
-        return CreatedAtAction(nameof(GetOrderById), new { id = orderResponse.Id }, orderResponse);
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (!int.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
+
+        var order = await _orderService.AddOrderAsync(createOrderDto, userId);
+
+        return CreatedAtAction(
+            nameof(GetOrderById),
+            new { id = order.Id },
+            order);
     }
 
     [Authorize]
@@ -41,12 +53,27 @@ public class OrdersController : ControllerBase
         return Ok(orderResponse);
     }
 
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<OrderResponseDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllOrders()
     {
         var orders = await _orderService.GetAllOrdersAsync();
+        return Ok(orders);
+    }
+
+    [Authorize]
+    [HttpGet("my-orders")]
+    [ProducesResponseType(typeof(IEnumerable<OrderResponseDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IEnumerable<OrderResponseDto>>> GetMyOrders()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (!int.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
+
+        var orders = await _orderService.GetByUserIdAsync(userId);
+
         return Ok(orders);
     }
 

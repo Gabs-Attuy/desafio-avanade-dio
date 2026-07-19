@@ -16,4 +16,7 @@ public class ProductDto
     
     [Required]
     public int Stock { get; set; }
+    
+    [Required]
+    public bool IsActive { get; set; }
 }

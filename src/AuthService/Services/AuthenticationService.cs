@@ -26,8 +26,12 @@ public class AuthenticationService : IAuthenticationService
     public async Task<AuthResponseDto> RegisterAsync(
         RegisterUserDto dto)
     {
+        var email = dto.Email
+            .Trim()
+            .ToLowerInvariant();
+
         var existingUser =
-            await _userRepository.GetUserByEmailAsync(dto.Email);
+            await _userRepository.GetUserByEmailAsync(email);
 
         if (existingUser is not null)
         {
