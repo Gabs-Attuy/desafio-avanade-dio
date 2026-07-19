@@ -73,4 +73,14 @@ public class ProductsController : ControllerBase
         var updatedProduct = await _productService.UpdateProductAsync(id, dto);
         return Ok(updatedProduct);
     }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPatch("{id}")]
+    [ProducesResponseType(typeof(ProductResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateProductStatus(int id)
+    {
+        var updatedProduct = await _productService.UpdateProductStatusAsync(id);
+        return Ok(updatedProduct);
+    }
 }

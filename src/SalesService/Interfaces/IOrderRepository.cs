@@ -8,4 +8,5 @@ public interface IOrderRepository
     Task<IEnumerable<Order>> GetAllAsync();
     Task AddAsync(Order order);
     Task UpdateAsync(Order order);
+    Task<IEnumerable<Order>> GetByUserIdAsync(int userId);
 }

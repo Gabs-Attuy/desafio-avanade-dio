@@ -22,7 +22,7 @@ public class OrderService : IOrderService
         _orderCreatedProducer = orderCreatedProducer;
     }
 
-    public async Task<OrderResponseDto> AddOrderAsync(CreateOrderDto createOrderDto)
+    public async Task<OrderResponseDto> AddOrderAsync(CreateOrderDto createOrderDto, int userId)
     {
         if (createOrderDto.Items == null || createOrderDto.Items.Count == 0)
         {
@@ -41,6 +41,11 @@ public class OrderService : IOrderService
                 throw new InvalidOperationException($"Estoque insuficiente para o produto {product.Name}. Requisitado: {itemDto.Quantity}, Disponível: {product.Stock}");
             }
             
+            if (!product.IsActive)
+            {
+                throw new InvalidOperationException($"O produto {product.Name} está desativado no momento.");
+            }
+            
             var orderItem = new OrderItem
             {
                 ProductId = itemDto.ProductId,
@@ -53,6 +58,7 @@ public class OrderService : IOrderService
         }
 
         order.TotalAmount = order.Items.Sum(i => i.UnitPrice * i.Quantity);
+        order.UserId = userId;
 
         await _orderRepository.AddAsync(order);
 
@@ -86,6 +92,13 @@ public class OrderService : IOrderService
         return orders.Select(ToDto);
     }
 
+    public async Task<IEnumerable<OrderResponseDto>> GetByUserIdAsync(int userId)
+    {
+        var orders = await _orderRepository.GetByUserIdAsync(userId);
+
+        return orders.Select(ToDto);
+    }
+
     public async Task<OrderResponseDto> UpdateOrderStatusAsync(int orderId, OrderStatusEnum status)
     {
         var order = await _orderRepository.GetByIdAsync(orderId) ?? throw new KeyNotFoundException($"Pedido com ID {orderId} não encontrado.");
@@ -102,6 +115,7 @@ public class OrderService : IOrderService
         return new OrderResponseDto
         {
             Id = order.Id,
+            UserId = order.UserId,
             TotalAmount = order.TotalAmount,
             Status = order.Status,
             CreatedAt = order.OrderDate,

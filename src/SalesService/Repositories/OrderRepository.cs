@@ -40,4 +40,12 @@ public class OrderRepository : IOrderRepository
         _context.Orders.Update(order);
         await _context.SaveChangesAsync();
     }
+
+    public async Task<IEnumerable<Order>> GetByUserIdAsync(int userId)
+    {
+        return await _context.Orders
+            .Include(o => o.Items)
+            .Where(o => o.UserId == userId)
+            .ToListAsync();
+    }
 }
