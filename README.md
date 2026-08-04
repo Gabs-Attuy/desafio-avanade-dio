@@ -308,13 +308,13 @@ Para executar a aplicação, é necessário possuir:
 ### 1. Clone o repositório
 
 ```bash
-git clone <URL_DO_REPOSITORIO>
+git clone https://github.com/Gabs-Attuy/desafio-avanade-dio.git
 ```
 
 Acesse o diretório:
 
 ```bash
-cd <NOME_DO_REPOSITORIO>
+cd desafio-avanade-dio
 ```
 
 ### 2. Configure os bancos de dados
