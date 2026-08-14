@@ -102,12 +102,25 @@ builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IOrderCreatedProducer, OrderCreatedProducer>();
 
+var inventoryBaseUrl =
+    builder.Configuration["InventoryService:BaseUrl"]
+    ?? throw new InvalidOperationException(
+        "A URL do InventoryService não foi configurada.");
+        
 builder.Services.AddHttpClient<IInventoryClient, InventoryClient>(client =>
 {
-    client.BaseAddress = new Uri("http://localhost:5218/");
+    client.BaseAddress = new Uri(inventoryBaseUrl);
 });
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider
+        .GetRequiredService<SalesContext>();
+
+    await dbContext.Database.MigrateAsync();
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

@@ -104,6 +104,8 @@ using (var scope = app.Services.CreateScope())
     var configuration =
         scope.ServiceProvider.GetRequiredService<IConfiguration>();
 
+    await context.Database.MigrateAsync();
+
     await DbInitializer.SeedAsync(
         context,
         configuration);
