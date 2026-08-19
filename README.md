@@ -2,7 +2,7 @@
 
 Sistema backend desenvolvido com arquitetura de microserviços para gerenciamento de estoque, autenticação de usuários e processamento de vendas.
 
-O projeto foi desenvolvido como desafio técnico do bootcamp Avanade - Back-end com .NET e IA, com o objetivo de aplicar conceitos de arquitetura distribuída utilizando **.NET 8**, **ASP.NET Core**, **Entity Framework Core**, **SQL Server**, **RabbitMQ**, **JWT** e **API Gateway**.
+O projeto foi desenvolvido como desafio técnico do bootcamp Avanade - Back-end com .NET e IA, com o objetivo de aplicar conceitos de arquitetura distribuída utilizando **.NET 8**, **ASP.NET Core**, **Entity Framework Core**, **SQL Server**, **RabbitMQ**, **JWT**, **API Gateway**, **Docker** e **Docker Compose**.
 
 ---
 
@@ -19,26 +19,51 @@ A aplicação é composta por três microserviços independentes e um API Gatewa
                          ┌─────────────────────┐
                          │     API Gateway     │
                          │        YARP         │
+                         |       :8080         |
                          └──────────┬──────────┘
                                     │
                  ┌──────────────────┼──────────────────┐
                  │                  │                  │
                  ▼                  ▼                  ▼
         ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
-        │   AuthService   │ │ InventoryService│ │   SalesService  │
+        │   AuthService   │ │InventoryService │ │  SalesService   │
+        |      :8080      | |      :8080      | |      :8080      |
         │                 │ │                 │ │                 │
-        │ Users           │ │ Products        │ │ Orders          │
+        │ Users           │ │ Products        │ │  Orders         │
         │ Authentication  │ │                 │ │                 │
         │ JWT             │ │                 │ │                 │
-        └─────────────────┘ └────────▲────────┘ └────────┬────────┘
-                                     │                   │
-                                     │    RabbitMQ       │
-                                     └───────────────────┘
+        └───────┬─────────┘ └────────▲────────┘ └────────┬────────┘
+                |                    │                   │
+                |             ┌──────┴────┐              │
+                │             │  RabbitMQ │◄─────────────┘
+                │             │   :5672   │
+                │             └───────────┘
+                │
+                └────────────────┬─────────────────────────────┐
+                                 │                             │
+                                 ▼                             ▼
+                           ┌────────────────────────────────────────────┐
+                           │                 SQL Server                 │
+                           │                                            │
+                           │   ┌──────────┐ ┌──────────┐ ┌───────────┐  │
+                           │   │  AuthDb  │ │ SalesDb  │ │InventoryDb│  │
+                           │   │          │ │          │ │           |  │
+                           │   └──────────┘ └──────────┘ └───────────┘  │
+                           └────────────────────────────────────────────┘
+```
+Cada microserviço possui seu próprio banco de dados, mantendo o isolamento dos dados entre os serviços:
+
+```text
+AuthService       → AuthDb
+SalesService      → SalesDb
+InventoryService  → InventoryDb
 ```
 
 O **API Gateway** atua como ponto central de entrada da aplicação e utiliza o YARP para encaminhar as requisições ao microserviço responsável.
 
-A comunicação entre `SalesService` e `InventoryService` utiliza RabbitMQ. Após a criação de um pedido, um evento é publicado para que a atualização do estoque seja processada de maneira assíncrona.
+A comunicação entre `SalesService` e `InventoryService` combina comunicação síncrona via HTTP e comunicação assíncrona através do RabbitMQ.
+
+Após a criação de um pedido, um evento é publicado para que a atualização do estoque seja processada de maneira assíncrona.
 
 ---
 
@@ -52,6 +77,8 @@ A comunicação entre `SalesService` e `InventoryService` utiliza RabbitMQ. Apó
 * RabbitMQ
 * JWT Bearer Authentication
 * YARP Reverse Proxy
+* Docker
+* Docker Compose
 * Swagger / OpenAPI
 * MSTest
 * Moq
@@ -82,6 +109,8 @@ Admin
 
 As credenciais autenticadas são utilizadas para acessar os endpoints protegidos dos demais serviços.
 
+O serviço utiliza o `AuthDb` para persistência dos usuários.
+
 ---
 
 ### 📦 InventoryService
@@ -101,6 +130,8 @@ Principais funcionalidades:
 Produtos não são excluídos fisicamente do banco de dados. Em vez disso, podem ser desativados, preservando seu histórico e impedindo novas vendas enquanto estiverem inativos.
 
 A atualização do estoque ocorre após o recebimento de eventos publicados pelo `SalesService` através do RabbitMQ.
+
+O serviço utiliza o `InventoryDb` para persistência dos produtos e estoques.
 
 ---
 
@@ -122,6 +153,8 @@ Principais funcionalidades:
 Durante a criação de um pedido, o `SalesService` consulta o `InventoryService` para obter os dados atuais dos produtos e validar a operação.
 
 Após o pedido ser persistido, é publicado um evento contendo os produtos e quantidades adquiridas.
+
+O serviço utiliza o `SalesDb` para persistência dos pedidos.
 
 ---
 
@@ -210,6 +243,137 @@ O Gateway é responsável pelo roteamento, enquanto autenticação, autorizaçã
 
 ---
 
+## 🐳 Containerização
+
+A aplicação foi completamente containerizada utilizando Docker e Docker Compose.
+
+O ambiente de execução é composto por:
+
+```text
+┌──────────────────────────────────────────────┐
+│              Docker Compose                  │
+│                                              │
+│   ┌─────────────┐     ┌─────────────┐        │
+│   │ API Gateway │     │  RabbitMQ   │        │
+│   │    :8080    │     │    :5672    │        │
+│   └──────┬──────┘     └──────▲──────┘        │
+│          │                   │               │
+│     ┌────┼────────┐          │               │
+│     ▼    ▼        ▼          │               │
+│   Auth  Sales  Inventory ────┘               │
+│                                              │
+│              ┌──────────────┐                │
+│              │ SQL Server   │                │
+│              │    :1433     │                │
+│              └──────────────┘                │
+│                                              │
+└──────────────────────────────────────────────┘
+```
+
+O docker-compose.yml é responsável por orquestrar:
+
+* AuthService;
+* InventoryService;
+* SalesService;
+* API Gateway;
+* RabbitMQ;
+* SQL Server.
+  
+**Comunicação entre containers**
+
+Os serviços utilizam os nomes dos containers para comunicação interna.
+
+Por exemplo:
+
+```text
+SalesService
+     │
+     └──→ http://inventory-service:8080
+```
+
+e:
+
+```text
+InventoryService
+     │
+     └──→ rabbitmq:5672
+```
+
+O SQL Server também é acessado através do nome do serviço:
+
+```text
+Server=sqlserver,1433
+```
+
+Isso evita dependências de `localhost` entre containers.
+
+**Bancos independentes**
+
+Embora os bancos utilizem a mesma instância do SQL Server, cada microserviço possui seu próprio database:
+
+```text
+SQL Server
+│
+├── AuthDb
+├── InventoryDb
+└── SalesDb
+```
+
+Essa separação mantém o isolamento lógico dos dados entre os microserviços.
+
+**Persistência**
+
+Os dados do SQL Server são armazenados através de um volume Docker:
+
+```text
+volumes:
+  sqlserver-data:
+```
+
+Dessa forma, a recriação dos containers não remove os dados persistidos.
+
+**Migrations**
+
+Os microserviços aplicam automaticamente as migrations do Entity Framework Core durante a inicialização.
+
+O `AuthService`, além de aplicar as migrations, executa o processo de seed para garantir a existência do usuário administrador inicial.
+
+Isso permite iniciar o ambiente sem a necessidade de executar manualmente:
+
+```bash
+dotnet ef database update
+```
+
+---
+
+## 🔐 Variáveis de ambiente
+
+Informações sensíveis não são armazenadas diretamente no docker-compose.yml.
+
+O projeto utiliza um arquivo .env para configurar:
+
+```text
+MSSQL_SA_PASSWORD
+JWT_KEY
+RABBITMQ_USER
+RABBITMQ_PASSWORD
+SEED_ADMIN_PASSWORD
+```
+
+Um arquivo `.env.example` é disponibilizado como referência.
+
+Para configurar o ambiente:
+
+```bash
+cp .env.example .env
+```
+
+Depois, preencha os valores necessários no arquivo `.env`.
+
+> ⚠️ **Importante:** o arquivo `.env` não deve ser versionado no Git.
+
+---
+
 ## 🧪 Testes automatizados
 
 A aplicação possui testes automatizados utilizando MSTest e Moq.
@@ -278,34 +442,49 @@ dotnet test
 .
 ├── src/
 │   ├── ApiGateway/
+│   │   ├── Dockerfile
+│   │   └── ...
+│   │
 │   ├── AuthService/
+│   │   ├── Dockerfile
+│   │   └── ...
+│   │
 │   ├── InventoryService/
+│   │   ├── Dockerfile
+│   │   └── ...
+│   │
 │   └── SalesService/
+│       ├── Dockerfile
+│       └── ...
 │
 ├── tests/
 │   ├── AuthService.Tests/
 │   ├── InventoryService.Tests/
 │   └── SalesService.Tests/
 │
-└── ECommerceMicroservices.sln
+├── .env.example
+├── .gitignore
+├── docker-compose.yml
+├── ECommerceMicroservices.sln
+└── README.md
 ```
 
-Cada microserviço possui suas próprias responsabilidades, configurações e acesso aos recursos necessários para seu funcionamento.
+Cada microserviço possui suas próprias responsabilidades, configurações, Dockerfile e acesso aos recursos necessários para seu funcionamento.
 
 ---
 
 ## ▶️ Executando o projeto
 
-### Pré-requisitos
+### Opção 1 — Docker Compose
 
-Para executar a aplicação, é necessário possuir:
+A forma recomendada de executar a aplicação é utilizando Docker Compose.
 
-* .NET 8 SDK;
-* SQL Server;
-* RabbitMQ;
+**Pré-requisitos**
+* Docker;
+* Docker Compose;
 * Git.
-
-### 1. Clone o repositório
+  
+**1. Clone o repositório**
 
 ```bash
 git clone https://github.com/Gabs-Attuy/desafio-avanade-dio.git
@@ -317,7 +496,153 @@ Acesse o diretório:
 cd desafio-avanade-dio
 ```
 
-### 2. Configure os bancos de dados
+**2. Configure as variáveis de ambiente**
+
+Crie o `.env` a partir do arquivo de exemplo:
+
+```bash
+cp .env.example .env
+```
+
+Configure as variáveis:
+
+```env
+MSSQL_SA_PASSWORD=SuaSenha
+JWT_KEY=SuaChaveJWT
+RABBITMQ_USER=SeuUsuario
+RABBITMQ_PASSWORD=SuaSenha
+SEED_ADMIN_PASSWORD=SuaSenha
+```
+
+**3. Inicie a aplicação**
+
+```bash
+docker compose up -d --build
+```
+
+O Docker Compose irá iniciar:
+
+```text
+SQL Server
+RabbitMQ
+AuthService
+InventoryService
+SalesService
+API Gateway
+```
+
+**4. Verifique os containers**
+
+```bash
+docker compose ps
+```
+
+Para acompanhar os logs:
+
+```bash
+docker compose logs -f
+```
+
+**5. Acesse os serviços**
+
+**API Gateway**
+
+```http
+http://localhost:8080
+```
+
+**InventoryService**
+
+```http
+http://localhost:8081/swagger
+```
+
+**SalesService**
+
+```http
+http://localhost:8082/swagger
+```
+
+**AuthService**
+
+```http
+http://localhost:8083/swagger
+```
+
+**RabbitMQ Management**
+
+```http
+http://localhost:15672
+```
+
+O Gateway deve ser utilizado como principal ponto de entrada da aplicação:
+
+```text
+/api/auth/*
+/api/inventory/*
+/api/sales/*
+```
+
+**Credenciais Iniciais**
+
+O `AuthService` cria automaticamente um usuário administrador durante a inicialização.
+
+```text
+E-mail:
+admin@ecommerce.com
+
+Senha:
+valor configurado em SEED_ADMIN_PASSWORD
+```
+
+A senha não é armazenada em texto puro. O projeto utiliza `PasswordHasher<User>` para gerar o hash antes da persistência.
+
+**Parando a aplicação**
+
+Para parar e remover os containers:
+
+```bash
+docker compose down
+```
+
+O volume do SQL Server não é removido, portanto os dados permanecem disponíveis para a próxima inicialização.
+
+Para remover também os volumes e recriar completamente o ambiente:
+
+```bash
+docker compose down -v
+```
+
+> ⚠️ O comando acima remove os dados persistidos do SQL Server.
+
+---
+
+### Opção 2 — Executando sem Docker
+
+Também é possível executar os projetos diretamente utilizando o .NET SDK.
+
+**Pré-requisitos**
+
+Para executar a aplicação, é necessário possuir:
+
+* .NET 8 SDK;
+* SQL Server;
+* RabbitMQ;
+* Git.
+
+**1. Clone o repositório**
+
+```bash
+git clone https://github.com/Gabs-Attuy/desafio-avanade-dio.git
+```
+
+Acesse o diretório:
+
+```bash
+cd desafio-avanade-dio
+```
+
+**2. Configure os bancos de dados**
 
 Configure as connection strings nos arquivos `appsettings.json` dos serviços que utilizam persistência.
 
@@ -335,7 +660,7 @@ dotnet ef database update --project src/InventoryService
 dotnet ef database update --project src/SalesService
 ```
 
-### 3. Configure o JWT
+**3. Configure o JWT**
 
 No `AuthService`, configure:
 
@@ -350,7 +675,7 @@ No `AuthService`, configure:
 
 Os serviços que validam os tokens devem utilizar configurações compatíveis de assinatura, issuer e audience.
 
-### 4. Inicie o RabbitMQ
+**4. Inicie o RabbitMQ**
 
 Certifique-se de que o servidor RabbitMQ esteja disponível de acordo com as configurações utilizadas pelos serviços.
 No meu caso, criei um container com a imagem do RabbitMQ com o seguinte comando:
@@ -363,7 +688,7 @@ docker run -d \
   rabbitmq:4-management
 ```
 
-### 5. Execute os microserviços
+**5. Execute os microserviços**
 
 Inicie:
 
@@ -376,7 +701,7 @@ ApiGateway
 
 As portas utilizadas podem ser consultadas nos respectivos arquivos `launchSettings.json`.
 
-### 6. Acesse a aplicação
+**6. Acesse a aplicação**
 
 Utilize o endereço do API Gateway como ponto principal de entrada para realizar as requisições.
 
@@ -395,6 +720,14 @@ Durante o desenvolvimento, algumas decisões foram tomadas para melhorar a estru
 **Autorização distribuída:** cada microserviço valida o JWT e controla o acesso aos seus próprios recursos.
 
 **API Gateway focado em roteamento:** o Gateway utiliza YARP como ponto central de entrada sem concentrar regras de negócio ou autorização.
+
+**Separação dos bancos:** cada microserviço possui seu próprio database, reduzindo o acoplamento entre os serviços.
+
+**Comunicação híbrida:** comunicação síncrona via HTTP é utilizada quando o `SalesService` precisa consultar informações do `InventoryService`, enquanto eventos RabbitMQ são utilizados para atualização assíncrona do estoque.
+
+**Containerização:** Docker Compose foi utilizado para reproduzir todo o ambiente da aplicação, incluindo microserviços e infraestrutura necessária.
+
+**Migrations automáticas:** os serviços aplicam migrations durante a inicialização, reduzindo a necessidade de configuração manual do banco de dados.
 
 **Separação dos projetos de testes:** cada microserviço possui seu próprio projeto de testes, mantendo isolamento e organização.
 
@@ -418,6 +751,10 @@ O desenvolvimento deste projeto permitiu aplicar na prática conceitos important
 * Testes unitários;
 * Mock de dependências;
 * Segurança e armazenamento de senhas.
+* Containerização com Docker;
+* Orquestração com Docker Compose;
+* Comunicação entre containers;
+* Persistência através de volumes;
 
 ---
 
@@ -428,7 +765,6 @@ Como possíveis evoluções do projeto:
 * Implementação do padrão Outbox para garantir maior consistência na publicação de eventos;
 * Dead Letter Queue para tratamento de mensagens que falharem;
 * Retry policies e resiliência na comunicação entre serviços;
-* Containerização com Docker e Docker Compose;
 * Observabilidade centralizada com logs, métricas e tracing distribuído;
 * Testes de integração e end-to-end;
 * CI/CD para execução automática dos testes.
